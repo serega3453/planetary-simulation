@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
+#define RLIGHTS_IMPLEMENTATION
+#include "rlights.h"
+#include "raymath.h"
 
 typedef struct
 {
@@ -10,9 +13,15 @@ typedef struct
 
 typedef struct
 {
+    double x, y;
+} Vec2;
+
+typedef struct
+{
     double mass;
     Vec3 position;
     Vec3 velocity;
+    Model model;
 } Object;
 
 typedef struct
@@ -56,12 +65,11 @@ Vec3 randomVec3(float min, float max)
 
 void drawObject(ObjectArray* objectArray, int index)
 {
-    DrawSphere(vecToVector(objectArray->objects[index].position), 1.0, ORANGE);
+    DrawModel(objectArray->objects[index].model, vecToVector(objectArray->objects[index].position), 1.0, ORANGE);
 }
 
 void draw3D(ObjectArray* objectArray)
 {
-    DrawSphere((Vector3){0, 0, 0}, 0.3f, ORANGE);
     for (int i = 0; i < objectArray->count; i++)
     {
         drawObject(objectArray, i);
@@ -69,10 +77,53 @@ void draw3D(ObjectArray* objectArray)
     DrawGrid(10, 1.0f);
 }
 
+Shader shaderInit()
+{
+    Shader shader = LoadShader("lighting.vs", "lighting.fs");
+    int ambientLoc = GetShaderLocation(shader, "ambient");
+    float ambient[4] = {0.1f, 0.1f, 0.1f, 1.0f};
+    SetShaderValue(shader, ambientLoc, ambient, SHADER_UNIFORM_VEC4);
+    return shader;
+}
+
 void draw2D()
 {
 
 
+}
+
+void moveCamera(Camera* cam)
+{
+    double dx = cam->target.x - cam->position.x;
+    double dy = cam->target.y - cam->position.y;
+    double dz = cam->target.z - cam->position.z;
+
+    double dirMag = sqrt(dx * dx + dy * dy + dz * dz);
+
+    Vec3 dirNorm = (Vec3){dx / dirMag, dy / dirMag, dz / dirMag};
+
+    Vec3 rightNorm = (Vec3){-dirNorm.z, 0.0, dirNorm.x};
+
+    Vec3 controls = (Vec3){0.0, 0.0, 0.0};
+    double speed = 0.05;
+
+    if (IsKeyDown(KEY_W)) controls.y += speed;
+    if (IsKeyDown(KEY_S)) controls.y -= speed;
+    if (IsKeyDown(KEY_A)) controls.x -= speed;
+    if (IsKeyDown(KEY_D)) controls.x += speed;
+
+    if (IsKeyDown(KEY_SPACE)) controls.z += speed;
+    if (IsKeyDown(KEY_LEFT_CONTROL)) controls.z -= speed;
+
+    Vec3 dirMove = (Vec3){
+        (dirNorm.x * controls.y) + (rightNorm.x * controls.x),
+        (dirNorm.y * controls.y) + controls.z,
+        (dirNorm.z * controls.y) + (rightNorm.z * controls.x)
+    };
+
+    cam->position.x += dirMove.x;
+    cam->position.y += dirMove.y;
+    cam->position.z += dirMove.z;
 }
 
 int main()
@@ -82,29 +133,41 @@ int main()
     ObjectArray objectArray;
     arrayInit(&objectArray);
 
-    for (int i = 0; i < 10; i++)
-    {
-        addObject(&objectArray, (Object){1.0, randomVec3(-5.0, 5.0), (Vec3){0.0, 0.0, 0.0}});
-    }
-
     InitWindow(640, 480, "test");
     Camera3D camera = {
-        .position = {0, 10, 20},
+        .position = {0, 10, 10},
         .target = {0, 0, 0},
         .up = {0, 1, 0},
-        .fovy = 45,
+        .fovy = 60,
         .projection = CAMERA_PERSPECTIVE
     };
 
-    while (!WindowShouldClose()) {
+   SetTargetFPS(60);
+
+    Model sphere = LoadModelFromMesh(GenMeshSphere(1.0f, 16, 16));
+    Shader shader = shaderInit();
+
+    sphere.materials[0].shader = shader;
+
+    Light light = CreateLight(LIGHT_POINT, (Vector3){0,5,0}, (Vector3){0, 0, 0}, WHITE, shader);
+
+    for (int i = 0; i < 10; i++)
+    {
+        addObject(&objectArray, (Object){1.0, randomVec3(-5.0, 5.0), (Vec3){0.0, 0.0, 0.0}, sphere});
+    }
+
+    while (!WindowShouldClose()) 
+    {
         BeginDrawing();
         ClearBackground(BLACK);
         BeginMode3D(camera);
+        moveCamera(&camera);
+        UpdateLightValues(shader, light);
         draw3D(&objectArray);
         EndMode3D();
         draw2D();
         EndDrawing();
     }
     CloseWindow();
-    //return 0;
+    return 0;
 }
