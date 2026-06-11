@@ -1,0 +1,48 @@
+#include "types.h"
+#include "array.h"
+
+void gravityForce(Object* obj1, Object* obj2, float dt)
+{
+	float G = 0.2;
+
+	Vec3 diff = substractVec3(obj2->position, obj1->position);
+
+	float r = distanceVec3(obj1->position, obj2->position) + 0.2f;
+
+	float F = G * obj1->mass * obj2->mass / pow(r, 2);
+
+	Vec3 force = scaleVec3(diff, F / r);
+
+	obj1->velocity = addVec3(obj1->velocity, scaleVec3(force, dt / obj1->mass));
+	obj2->velocity = substractVec3(obj2->velocity, scaleVec3(force, dt / obj2->mass));
+}
+
+void collisionResolver(ObjectArray* objectArray, int i, int j)
+{
+	objectArray->objects[i].mass >= objectArray->objects[j].mass ? removeObject(objectArray, j) : removeObject(objectArray, i);
+}
+
+int collisionDetect(Object obj1, Object obj2)
+{
+	return distanceVec3(obj1.position, obj2.position) <= ((obj1.mass / 2) + (obj2.mass / 2));
+}
+
+void simulationStep(ObjectArray* objectArray, float dt)
+{
+	for (int i = 0; i < objectArray->count; i++)
+	{
+		for (int j = i + 1; j < objectArray->count; j++)
+		{
+			gravityForce(&objectArray->objects[i], &objectArray->objects[j], dt);
+
+			if (collisionDetect(objectArray->objects[i], objectArray->objects[j]))
+			{
+				collisionResolver(objectArray, i, j);
+			}
+		}
+	}
+	for (int i = 0; i < objectArray->count; i++)
+	{
+		objectArray->objects[i].position = addVec3(objectArray->objects[i].position, scaleVec3(objectArray->objects[i].velocity, dt));
+	}
+}
