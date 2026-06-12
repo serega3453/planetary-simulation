@@ -14,6 +14,7 @@ typedef struct
 typedef struct
 {
     double mass;
+    double radius;
     Vec3 position;
     Vec3 velocity;
     Model model;

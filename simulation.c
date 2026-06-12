@@ -19,12 +19,23 @@ void gravityForce(Object* obj1, Object* obj2, float dt)
 
 void collisionResolver(ObjectArray* objectArray, int i, int j)
 {
-	objectArray->objects[i].mass >= objectArray->objects[j].mass ? removeObject(objectArray, j) : removeObject(objectArray, i);
+	if (objectArray->objects[i].mass >= objectArray->objects[j].mass)
+	{
+		objectArray->objects[i].mass += objectArray->objects[j].mass;
+		objectArray->objects[i].radius = powf(objectArray->objects[i].mass, 1.0 / 3.0);
+		removeObject(objectArray, j);
+	}
+	else
+	{
+		objectArray->objects[j].mass += objectArray->objects[i].mass;
+		objectArray->objects[j].radius = powf(objectArray->objects[j].mass, 1.0 / 3.0);
+		removeObject(objectArray, i);
+	}
 }
 
 int collisionDetect(Object obj1, Object obj2)
 {
-	return distanceVec3(obj1.position, obj2.position) <= ((obj1.mass / 2) + (obj2.mass / 2));
+	return distanceVec3(obj1.position, obj2.position) <= (obj1.radius + obj2.radius);
 }
 
 void simulationStep(ObjectArray* objectArray, float dt)

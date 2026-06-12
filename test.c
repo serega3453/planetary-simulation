@@ -18,7 +18,7 @@ Vector3 vecToVector(Vec3 vec)
 
 void drawObject(ObjectArray* objectArray, int index)
 {
-    DrawModel(objectArray->objects[index].model, vecToVector(objectArray->objects[index].position), objectArray->objects[index].mass, ORANGE);
+    DrawModel(objectArray->objects[index].model, vecToVector(objectArray->objects[index].position), objectArray->objects[index].radius * 3, ORANGE);
 }
 
 void draw3D(ObjectArray* objectArray)
@@ -34,13 +34,22 @@ Shader shaderInit()
 {
     Shader shader = LoadShader("lighting.vs", "lighting.fs");
     int ambientLoc = GetShaderLocation(shader, "ambient");
-    float ambient[4] = {0.1f, 0.1f, 0.1f, 1.0f};
+    float ambient[4] = {0.3f, 0.3f, 0.3f, 1.0f};
     SetShaderValue(shader, ambientLoc, ambient, SHADER_UNIFORM_VEC4);
     return shader;
 }
 
-void draw2D()
+void draw2D(ObjectArray* objectArray, Camera cam)
 {
+    for (int i = 0; i < objectArray->count; i++)
+    {
+        if (Vector3Distance((Vector3){objectArray->objects[i].position.x, objectArray->objects[i].position.y, objectArray->objects[i].position.z}, cam.position) <= 10000.0)
+        {
+           Vector2 screenPos = GetWorldToScreen((Vector3){objectArray->objects[i].position.x, objectArray->objects[i].position.y, objectArray->objects[i].position.z}, cam);
+            DrawCircleV(screenPos, 3.0f, WHITE);  
+        } 
+    }
+
     DrawFPS(10, 10);
 }
 
@@ -123,6 +132,8 @@ int main()
     srand(time(NULL));
 
     float timeScale = 10.0;
+    int simulationFrames = 2;
+    float scaleModifier = 2.0;
 
     ObjectArray objectArray;
     arrayInit(&objectArray);
@@ -149,17 +160,22 @@ int main()
 
     Light light = CreateLight(LIGHT_POINT, (Vector3){0,5,0}, (Vector3){0, 0, 0}, WHITE, shader);
 
-    addObject(&objectArray, (Object){100.0, (Vec3){0.0, 0.0, 0.0}, (Vec3){0.0, 0.0, 0.0}, sphere});
+    addObject(&objectArray, (Object){10000.0, powf(10000, 1.0 / 3.0) * scaleModifier, (Vec3){0.0, 0.0, 0.0}, (Vec3){0.0, 0.0, 0.0}, sphere});
+    addObject(&objectArray, (Object){10.0, 3.0, (Vec3){150.0, 0.0, 0.0}, (Vec3){0.0, 0.0, 0.4}, sphere});
 
-    for (int i = 0; i < 50; i++)
+    for (int i = 0; i < 200; i++)
     {
-        addObject(&objectArray, (Object){randFloat(1.0, 10.0), randomVec3(-500.0, 500.0), randomVec3(-0.5, 0.5), sphere});
+        float mass = randFloat(1.0, 100.0);
+        addObject(&objectArray, (Object){mass, powf(mass, 1.0 / 3.0), randomVec3(-1000.0, 1000.0), randomVec3(-1.0, 1.0), sphere});
     }
 
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
-        simulationStep(&objectArray, dt * timeScale);
+        for (int i = 0; i < simulationFrames; i++)
+        {
+           simulationStep(&objectArray, (dt / simulationFrames) * timeScale); 
+        }
         BeginDrawing();
         ClearBackground(BLACK);
         BeginMode3D(camera);
@@ -168,7 +184,7 @@ int main()
         UpdateLightValues(shader, light);
         draw3D(&objectArray);
         EndMode3D();
-        draw2D();
+        draw2D(&objectArray, camera);
         DrawText(TextFormat("Time scale: %.00f", timeScale), 10, 30, 20, WHITE); //temp
         DrawText(TextFormat("Object: %d", cameraTargetIterator), 10, 60, 20, WHITE); //temp
         EndDrawing();
